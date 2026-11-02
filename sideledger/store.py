@@ -97,8 +97,8 @@ def latest_turn(conn, session):
     return conn.execute("SELECT MAX(turn) AS turn FROM actions WHERE session = ?", (session,)).fetchone()["turn"]
 
 
-def unreviewed(conn, root=None):
-    rows = conn.execute("SELECT * FROM actions WHERE rating = 'irreversible' AND acked_at IS NULL ORDER BY id").fetchall()
+def unreviewed(conn, root=None, rating="irreversible"):
+    rows = conn.execute("SELECT * FROM actions WHERE rating = ? AND acked_at IS NULL ORDER BY id", (rating,)).fetchall()
     if root is None:
         return rows
     prefix = root.rstrip("/") + "/"
