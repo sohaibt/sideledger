@@ -1,0 +1,15 @@
+{
+ "session_id": "sess-1",
+ "transcript_path": "/home/me/.claude/projects/x/sess-1.jsonl",
+ "cwd": "/work/app",
+ "permission_mode": "default",
+ "hook_event_name": "PostToolUse",
+ "tool_name": "Read",
+ "tool_use_id": "t4",
+ "tool_input": {
+  "file_path": "/work/app/a.py"
+ },
+ "tool_response": {
+  "content": "x"
+ }
+}

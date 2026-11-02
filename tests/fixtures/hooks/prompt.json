@@ -1,0 +1,8 @@
+{
+ "session_id": "sess-1",
+ "transcript_path": "/home/me/.claude/projects/x/sess-1.jsonl",
+ "cwd": "/work/app",
+ "permission_mode": "default",
+ "hook_event_name": "UserPromptSubmit",
+ "prompt": "deploy it, the password is PROMPTCANARY"
+}
