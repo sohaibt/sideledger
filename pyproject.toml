@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sideledger"
+version = "0.1.0"
+description = "A per-turn receipt of what a coding agent changed outside the repo: deploys, pushes, database writes and cloud changes."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Sohaib Thiab" }]
+requires-python = ">=3.10"
+dependencies = []
+keywords = ["claude-code", "coding-agents", "ai-safety", "audit", "developer-tools"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Console",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/sohaibt/sideledger"
+Issues = "https://github.com/sohaibt/sideledger/issues"
+
+[project.scripts]
+sideledger = "sideledger.__main__:main"
+
+[tool.setuptools]
+packages = ["sideledger"]
+
+[tool.setuptools.package-data]
+sideledger = ["rules.json"]

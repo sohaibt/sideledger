@@ -55,6 +55,14 @@ class ShellForms(unittest.TestCase):
             "true || git push -f",
             "sudo -u root env A=1 git push -f",
             "xargs -n 1 git push -f",
+            "find . -name x -exec git push -f \\;",
+            "nohup git push -f &",
+            "timeout 30 git push -f",
+            "env -i git push -f",
+            "cd x;git push -f",
+            'sudo -u root bash -c "git push -f"',
+            '"git" push -f',
+            "git -c a=b --no-pager push -f",
         ]:
             got = classify(command)
             self.assertEqual((got["categories"], got["rating"]), (["git-push"], "irreversible"), command)
@@ -63,6 +71,16 @@ class ShellForms(unittest.TestCase):
         for command in ["echo \x24\x28\x281+2\x29\x29", "ls 2>&1", "for f in *.py; do wc -l \x24f; done"]:
             got = classify(command)
             self.assertEqual((got["categories"], got["rating"]), (["local"], "reversible"), command)
+
+
+class CurlFlags(unittest.TestCase):
+    def test_attached_and_combined_data_flags_are_writes(self):
+        for command in ["curl -sd x=1 https://a.example.com", "curl -dx=1 https://a.example.com", "curl -sST f https://a.example.com"]:
+            self.assertEqual(classify(command)["rating"], "unknown", command)
+
+    def test_common_download_flags_stay_reads(self):
+        for command in ["curl -fsSL https://a.example.com", "curl -sS -o f https://a.example.com", "curl -LO https://a.example.com/f"]:
+            self.assertEqual(classify(command)["rating"], "reversible", command)
 
 
 class Ruleset(unittest.TestCase):

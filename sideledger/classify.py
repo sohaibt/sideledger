@@ -165,12 +165,26 @@ def _commands(text):
         if tokens[0] == "eval":
             yield from _commands(" ".join(tokens[1:]))
             continue
+        if tokens[0] == "find":
+            # find -exec runs another command, and that command is the one that counts.
+            yield from _find_exec(tokens)
         if tokens[0] in SHELLS:
             inner = _shell_body(tokens)
             if inner is not None:
                 yield from _commands(inner)
                 continue
         yield tokens
+
+
+def _find_exec(tokens):
+    for i, token in enumerate(tokens):
+        if token in ("-exec", "-execdir", "-ok", "-okdir"):
+            inner = []
+            for word in tokens[i + 1:]:
+                if word in (";", "+"):
+                    break
+                inner.append(word)
+            yield from _commands(shlex.join(inner))
 
 
 def _shell_body(tokens):
