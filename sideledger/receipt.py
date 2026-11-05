@@ -5,13 +5,14 @@ import time
 from . import __version__
 
 LIMITS = ("sideledger reads command text only. A side effect hidden inside a script is rated unknown at best, "
-          "and nothing here proves a command did only what its text says.")
+          "and nothing here proves a command did only what its text says. "
+          "Only Bash commands are recorded, so MCP and other tools do not appear.")
 LEVELS = dict(irreversible="error", unknown="warning", reversible="note")
 SARIF_SCHEMA = "https://json.schemastore.org/sarif-2.1.0.json"
 HOMEPAGE = "https://github.com/sohaibt/sideledger"
 
 
-def build(rows, session, turn, show_all=False):
+def build(rows, session, turn, show_all=False, unreviewed_elsewhere=0):
     shown = [r for r in rows if show_all or r["categories"] != "local" or r["rating"] != "reversible"]
     actions = [dict(
         id=r["id"],
@@ -27,7 +28,8 @@ def build(rows, session, turn, show_all=False):
         failed=bool(r["failed"]),
         reviewed=r["acked_at"] is not None,
     ) for r in shown]
-    return dict(session=session, turn=turn, total=len(rows), local_hidden=len(rows) - len(shown), actions=actions, limits=LIMITS)
+    return dict(session=session, turn=turn, total=len(rows), local_hidden=len(rows) - len(shown), actions=actions,
+                unreviewed_elsewhere=unreviewed_elsewhere, limits=LIMITS)
 
 
 def action_lines(action):
@@ -49,7 +51,7 @@ def to_text(data):
     where = "turn %d" % data["turn"] if data["turn"] is not None else "all turns"
     lines = ["sideledger receipt: session %s, %s" % (data["session"], where), ""]
     if not data["actions"]:
-        lines += ["Nothing outside the repo, as far as the command text shows.", ""]
+        lines += ["No Bash command here reached outside the repo, as far as its text shows.", ""]
     for rating in ("irreversible", "unknown", "reversible"):
         group = [a for a in data["actions"] if a["rating"] == rating]
         if group:
@@ -60,6 +62,8 @@ def to_text(data):
     if data["local_hidden"]:
         noun = "command" if data["local_hidden"] == 1 else "commands"
         lines += ["%d local %s hidden (--all shows them)." % (data["local_hidden"], noun), ""]
+    if data["unreviewed_elsewhere"]:
+        lines += ["Also %d unreviewed irreversible action(s) not on this receipt. See: sideledger check --all" % data["unreviewed_elsewhere"], ""]
     lines.append("Limits: " + data["limits"])
     return "\n".join(lines)
 
@@ -87,7 +91,7 @@ def to_sarif(data):
             result["suppressions"] = [dict(kind="external")]
         results.append(result)
     driver = dict(name="sideledger", version=__version__, informationUri=HOMEPAGE, rules=rules)
-    run = dict(tool=dict(driver=driver), results=results, properties=dict(limits=data["limits"]))
+    run = dict(tool=dict(driver=driver), results=results, properties=dict(limits=data["limits"], unreviewedElsewhere=data["unreviewed_elsewhere"]))
     doc = dict(version="2.1.0", runs=[run])
     doc["\x24schema"] = SARIF_SCHEMA
     return json.dumps(doc, indent=2)

@@ -19,6 +19,11 @@ class RedactTest(unittest.TestCase):
             "mkdir -p src/lib",
             "curl https://api.example.com/v1/items",
             "docker run -d nginx",
+            "curl -f https://api.example.com/x",
+            "curl -fsSL https://api.example.com/x",
+            "curl -sS -o out.json https://api.example.com/x",
+            "gh pr view 3",
+            "psql --port=5432 -c 'select 1'",
         ]:
             self.assertEqual(redact(command), command)
 

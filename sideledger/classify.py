@@ -4,6 +4,7 @@ The command is split into pieces (&&, ;, pipes, subshells, command substitution,
 Each piece is matched against the rules in order; the first match wins. The worst rating is kept.
 """
 import json
+import os
 import pathlib
 import re
 import shlex
@@ -25,8 +26,11 @@ WRAPPERS = dict([
     ("sudo", ["-u", "-g", "-h", "-p", "-C", "-r", "-t", "-U"]), ("doas", ["-u", "-C"]), ("env", ["-u", "-C", "-S"]),
     ("xargs", ["-n", "-I", "-P", "-L", "-s", "-E", "-d", "-J"]), ("nice", ["-n"]), ("npx", ["-p", "--package", "-c"]),
     ("timeout", ["-s", "-k"]), ("bunx", []), ("time", []), ("nohup", []), ("command", []), ("exec", []),
-    ("builtin", []), ("caffeinate", []), ("setsid", []),
+    ("builtin", []), ("caffeinate", []), ("setsid", []), ("watch", ["-n"]),
 ])
+# Secret and tool-version runners: whatever follows "--" is the real command.
+RUNNERS = ("doppler", "op", "infisical", "mise", "dotenv", "dotenvx", "aws-vault")
+LEADING_CD = re.compile(r"""^\s*cd\s+("[^"]+"|'[^']+'|[^\s;&|]+)\s*(?:&&|;)""")
 PREFIXES = (("pnpm", "dlx"), ("pnpm", "exec"), ("yarn", "dlx"), ("npm", "exec"), ("bundle", "exec"),
             ("uv", "run"), ("poetry", "run"), ("pdm", "run"), ("pipx", "run"), ("rye", "run"))
 HEREDOC = re.compile(r"(?<!<)<<-?\s*([\x27\x22]?)([\w.-]+)\1([^\n]*)\n(.*?)(?:^\s*\2\s*$|\Z)", re.S | re.M)
@@ -137,6 +141,8 @@ def _unwrap(tokens):
         first = tokens[0]
         if first in KEYWORDS or re.match(r"^\w+=", first):
             tokens = tokens[1:]
+        elif first in RUNNERS and "--" in tokens:
+            tokens = tokens[tokens.index("--") + 1:]
         elif first in WRAPPERS:
             value_flags, is_timeout, rest, i = WRAPPERS[first], first == "timeout", tokens[1:], 0
             while i < len(rest) and (rest[i].startswith("-") or re.match(r"^\w+=", rest[i])):
@@ -196,6 +202,34 @@ def _shell_body(tokens):
     return None
 
 
+def working_folder(command, cwd):
+    """The folder a command acts in: a leading `cd X &&` moves it."""
+    found = LEADING_CD.match(command)
+    if not found:
+        return cwd
+    target = os.path.realpath(os.path.join(cwd, os.path.expanduser(found.group(1).strip("\"'"))))
+    return target if os.path.isdir(target) else cwd
+
+
+def _repo_root(cwd):
+    folder = cwd
+    while not os.path.exists(os.path.join(folder, ".git")):
+        parent = os.path.dirname(folder)
+        if parent == folder:
+            return cwd
+        folder = parent
+    return folder
+
+
+def _relative_to_repo(tokens, cwd):
+    """An absolute path inside the repo is not outside it, so rate rm on the path relative to the repo."""
+    root = _repo_root(cwd) + os.sep
+    def relative(token):
+        path = os.path.realpath(token)
+        return os.path.relpath(path, root) if token.startswith("/") and path.startswith(root) else token
+    return [relative(t) for t in tokens]
+
+
 def _match(tokens):
     text = re.sub(r"\s+", " ", " ".join(tokens)).strip()
     return next(rule for rule in RULES if rule["regex"].search(text))
@@ -251,11 +285,11 @@ def destinations_of(tokens):
     return found
 
 
-def classify(command):
-    """Return dict(categories, rating, rule, why, destinations) for a command's text."""
+def classify(command, cwd=None):
+    """Return dict(categories, rating, rule, why, destinations) for a command's text. cwd is the folder it ran in."""
     worst, categories, destinations = None, [], []
     for tokens in _commands(command):
-        rule = _match(tokens)
+        rule = _match(_relative_to_repo(tokens, cwd) if cwd and tokens[0] == "rm" else tokens)
         rank = (RATINGS.index(rule["rating"]), rule["category"] != "local")
         if worst is None or rank > (RATINGS.index(worst["rating"]), worst["category"] != "local"):
             worst = rule

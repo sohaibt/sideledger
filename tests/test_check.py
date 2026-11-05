@@ -39,6 +39,20 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(run(self.home, "check", cwd=self.repo).returncode, 0)
         self.assertEqual(run(self.home, "check", "--all", cwd=self.repo).returncode, 1)
 
+    def test_other_folders_are_mentioned_but_do_not_fail(self):
+        self.deploy_in(self.other)
+        result = run(self.home, "check", cwd=self.repo)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("1 unreviewed irreversible action(s) in other folders", result.stdout)
+
+    def test_a_cd_from_the_parent_folder_counts_for_the_repo(self):
+        fire(self.home, "bash_local", cwd=str(self.tmp), tool_input=dict(command="cd repo && terraform apply"))
+        self.assertEqual(run(self.home, "check", cwd=self.repo).returncode, 1)
+
+    def test_an_absolute_rm_inside_the_repo_does_not_block_commits(self):
+        fire(self.home, "bash_local", cwd=str(self.repo), tool_input=dict(command="rm -rf %s/build" % self.repo))
+        self.assertEqual(run(self.home, "check", cwd=self.repo).returncode, 0)
+
     def test_runs_from_a_subfolder_of_the_repo(self):
         self.deploy_in(self.repo)
         self.assertEqual(run(self.home, "check", cwd=self.repo / "sub").returncode, 1)
@@ -51,7 +65,7 @@ class CheckTest(unittest.TestCase):
 
     def test_unknown_and_reversible_do_not_fail_but_unknown_is_mentioned(self):
         fire(self.home, "bash_local", cwd=str(self.repo), tool_input=dict(command="./run.sh"))
-        fire(self.home, "bash_local", cwd=str(self.repo), tool_input=dict(command="git push"))
+        fire(self.home, "bash_local", cwd=str(self.repo), tool_input=dict(command="git push origin feat"))
         result = run(self.home, "check", cwd=self.repo)
         self.assertEqual(result.returncode, 0)
         self.assertIn("1 unknown", result.stdout)

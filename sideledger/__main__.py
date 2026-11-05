@@ -108,7 +108,7 @@ def cmd_receipt(args):
     conn = store.connect()
     session = args.session
     if session is None or session == "latest":
-        session = store.latest_session(conn)
+        session = store.latest_session(conn, _scope()) or store.latest_session(conn)
     if session is None:
         print("No commands recorded yet.")
         return 0
@@ -120,7 +120,9 @@ def cmd_receipt(args):
     if not rows:
         print("sideledger: nothing recorded for that session or turn.", file=sys.stderr)
         return 2
-    print(receipt.FORMATS[args.format](receipt.build(rows, session, turn, args.all)))
+    shown = {r["id"] for r in rows}
+    elsewhere = sum(r["id"] not in shown for r in store.unreviewed(conn))
+    print(receipt.FORMATS[args.format](receipt.build(rows, session, turn, args.all, elsewhere)))
     return 0
 
 
@@ -156,6 +158,9 @@ def cmd_check(args):
         print("Look at them, then run: sideledger ack")
     else:
         print("sideledger: no unreviewed irreversible actions.")
+    others = len(store.unreviewed(conn)) - len(rows)
+    if others:
+        print("Also %d unreviewed irreversible action(s) in other folders, which do not fail this check. See: sideledger check --all" % others)
     if unknown:
         print("Also %d unknown action(s), which do not fail this check. See: sideledger receipt --session latest" % unknown)
     print(receipt.LIMITS)

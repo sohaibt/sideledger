@@ -4,7 +4,7 @@ import pathlib
 import sqlite3
 import time
 
-from .classify import classify
+from .classify import classify, working_folder
 from .redact import redact
 
 DEFAULT_RETENTION_DAYS = 90
@@ -66,7 +66,8 @@ def next_turn(conn, session, now=None):
 def record(conn, session, cwd, command, failed, now=None):
     """Rate the raw text in memory, then store only the redacted text."""
     now = int(time.time() if now is None else now)
-    rated = classify(command)
+    cwd = working_folder(command, cwd)
+    rated = classify(command, cwd)
     cutoff = now - retention_days(conn) * 86400
     with conn:
         conn.execute("INSERT OR IGNORE INTO turns (session, turn, ts) VALUES (?, 1, ?)", (session, now))
@@ -88,9 +89,15 @@ def actions(conn, session, turn=None):
     return conn.execute("SELECT * FROM actions WHERE session = ? AND turn = ? ORDER BY id", (session, turn)).fetchall()
 
 
-def latest_session(conn):
-    row = conn.execute("SELECT session FROM actions ORDER BY id DESC LIMIT 1").fetchone()
-    return row["session"] if row else None
+def _in_folder(cwd, root):
+    return cwd == root or cwd.startswith(root.rstrip("/") + "/")
+
+
+def latest_session(conn, root=None):
+    for row in conn.execute("SELECT session, cwd FROM actions ORDER BY id DESC"):
+        if root is None or _in_folder(row["cwd"], root):
+            return row["session"]
+    return None
 
 
 def latest_turn(conn, session):
@@ -101,8 +108,7 @@ def unreviewed(conn, root=None, rating="irreversible"):
     rows = conn.execute("SELECT * FROM actions WHERE rating = ? AND acked_at IS NULL ORDER BY id", (rating,)).fetchall()
     if root is None:
         return rows
-    prefix = root.rstrip("/") + "/"
-    return [r for r in rows if r["cwd"] == root or r["cwd"].startswith(prefix)]
+    return [r for r in rows if _in_folder(r["cwd"], root)]
 
 
 def ack(conn, ids, now=None):

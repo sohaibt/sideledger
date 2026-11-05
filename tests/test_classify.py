@@ -1,9 +1,13 @@
 import json
+import os
 import pathlib
 import re
+import tempfile
+import time
 import unittest
 
-from sideledger.classify import CATEGORIES, RATINGS, classify, destinations_of
+from sideledger.classify import CATEGORIES, RATINGS, _relative_to_repo, classify, destinations_of, working_folder
+from sideledger.redact import redact
 from tests.command_cases import BENIGN, SIDE_EFFECTS
 
 
@@ -94,6 +98,61 @@ class Ruleset(unittest.TestCase):
             self.assertIn(r["rating"], RATINGS)
             self.assertTrue(r["why"])
             re.compile(r["pattern"])
+
+
+class Folders(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.top = os.path.realpath(tmp.name)
+        self.repo = os.path.join(self.top, "repo")
+        os.makedirs(os.path.join(self.repo, ".git"))
+        os.makedirs(os.path.join(self.repo, "sub"))
+
+    def rating(self, command, cwd):
+        return classify(command, cwd)["rating"]
+
+    def test_absolute_path_inside_the_repo_is_not_outside_it(self):
+        self.assertEqual(self.rating("rm -rf %s/build" % self.repo, self.repo), "reversible")
+        self.assertEqual(self.rating("rm -rf %s/build" % self.repo, os.path.join(self.repo, "sub")), "reversible")
+
+    def test_paths_that_leave_the_repo_stay_irreversible(self):
+        # The test folder itself is under the system temp, which rm-outside allows, so these leave it too.
+        for path in ("/opt/other", "%s/../other" % self.repo, "/tmp/../etc/x"):
+            self.assertEqual(self.rating("rm -rf " + path, self.repo), "irreversible", path)
+
+    def test_a_sibling_with_the_same_prefix_is_not_inside(self):
+        token = "%s-sibling/x" % self.repo
+        self.assertEqual(_relative_to_repo(["rm", token], self.repo), ["rm", token])
+
+    def test_without_a_folder_an_absolute_path_is_outside(self):
+        self.assertEqual(classify("rm -rf /opt/repo/build")["rating"], "irreversible")
+
+    def test_leading_cd_moves_the_working_folder(self):
+        self.assertEqual(working_folder("cd repo && terraform apply", self.top), self.repo)
+        self.assertEqual(working_folder("cd %s; ls" % self.repo, self.top), self.repo)
+        self.assertEqual(working_folder('cd "repo" && ls', self.top), self.repo)
+
+    def test_other_commands_keep_the_folder(self):
+        self.assertEqual(working_folder("terraform apply", self.top), self.top)
+        self.assertEqual(working_folder("cd missing && ls", self.top), self.top)
+        self.assertEqual(working_folder("cd repo", self.top), self.top)
+
+
+class Speed(unittest.TestCase):
+    def test_long_commands_cannot_stall_the_hook(self):
+        # The hook runs on every agent command. A nested regex here once took over 10 seconds on 200 tokens.
+        heads = ["aws", "kubectl", "gcloud", "az", "fly", "npm", "pnpm", "terraform", "pulumi", "git push",
+                 "git -C x push", "wrangler", "vercel", "netlify", "stripe", "gh api", "gh repo create", "docker compose",
+                 "curl", "psql", "rm -rf", "mvn"]
+        bodies = ["--a b ", "-x y ", "--a ", "-x ", "a b ", "a -b ", "-a -b c ", "x=1 ", "http://localhost/ "]
+        started = time.monotonic()
+        for head in heads:
+            for body in bodies:
+                command = head + " " + body * 500
+                classify(command)
+                redact(command)
+        self.assertLess(time.monotonic() - started, 30)
 
 
 class Destinations(unittest.TestCase):
