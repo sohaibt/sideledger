@@ -16,7 +16,7 @@ IRREVERSIBLE (2)
 
 1 local command hidden (--all shows them).
 
-Limits: sideledger reads command text only. A side effect hidden inside a script is rated unknown at best, and nothing here proves a command did only what its text says.
+Limits: sideledger reads command text only. A side effect hidden inside a script is rated unknown at best, and nothing here proves a command did only what its text says. Only Bash commands are recorded, so MCP and other tools do not appear.
 ```
 
 ## Install
@@ -58,7 +58,7 @@ printf '#!/bin/sh\nexec sideledger check\n' > .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
 ```
 
-`check` and `ack` look only at actions recorded in the current repo. Add `--all` for every repo. `ack` refuses to run inside a Claude Code session, because a person should do the reviewing. That stops the easy route, but it is not a security boundary: an agent that wants to can edit the database or commit with `--no-verify`.
+`check` and `ack` look only at actions recorded in the current repo. `check` still mentions unreviewed actions in other folders, and `--all` covers every repo. `ack` refuses to run inside a Claude Code session, because a person should do the reviewing. That stops the easy route, but it is not a security boundary: an agent that wants to can edit the database or commit with `--no-verify`.
 
 ## Ratings
 
@@ -76,12 +76,13 @@ Categories: `git-push`, `deploy`, `database`, `cloud`, `package-publish`, `netwo
 
 A SQLite file at `~/.sideledger/ledger.db`, readable only by you. Set `SIDELEDGER_HOME` to move it. Nothing leaves your machine.
 
-Stored: the redacted command, its rating, destinations, session, turn, folder and time. Never stored: prompts, tool output, and request bodies, heredoc bodies or SQL values in the command. Secrets are removed by pattern, so an unusual secret format can get through. Old history is deleted after the retention period, except unreviewed irreversible actions, which stay until reviewed.
+Stored: the redacted command, its rating, destinations, session, turn, folder and time. Never stored: prompts and tool output. Request bodies, heredoc bodies and SQL values in the command are removed by pattern, as are secrets, so an unusual form can get through. Inline script text (`python -c`, `mongosh --eval`), `redis-cli SET` values and custom request headers are kept after that redaction. Old history is deleted after the retention period, except unreviewed irreversible actions, which stay until reviewed.
 
 ## Limits
 
 - **It reads command text only.** A deploy inside `./ship.sh` shows as `unknown`. It does not watch the network or block anything.
-- **Coverage gap in 0.1.0.** The ruleset has no named rules yet for several of the most common hosted deploy and cloud CLIs, or for the main npm, PyPI, crates and Docker publish commands. These show on receipts as `local / unknown` ("not in the ruleset") and do **not** fail `check`. See [`backlog.md`](backlog.md).
+- **Bash only.** A deploy through an MCP tool or another agent tool is not recorded, so a clean receipt only speaks for Bash commands.
+- **Anything not in the ruleset** shows on receipts as `local / unknown` ("not in the ruleset") and does **not** fail `check`.
 - **Claude Code only** for now.
 
 ## How it is different
