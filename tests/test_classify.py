@@ -6,7 +6,7 @@ import tempfile
 import time
 import unittest
 
-from sideledger.classify import CATEGORIES, RATINGS, _relative_to_repo, classify, destinations_of, working_folder
+from sideledger.classify import CATEGORIES, RATINGS, _relative_to_repo, classify, destinations_of
 from sideledger.redact import redact
 from tests.command_cases import BENIGN, SIDE_EFFECTS
 
@@ -127,16 +127,6 @@ class Folders(unittest.TestCase):
 
     def test_without_a_folder_an_absolute_path_is_outside(self):
         self.assertEqual(classify("rm -rf /opt/repo/build")["rating"], "irreversible")
-
-    def test_leading_cd_moves_the_working_folder(self):
-        self.assertEqual(working_folder("cd repo && terraform apply", self.top), self.repo)
-        self.assertEqual(working_folder("cd %s; ls" % self.repo, self.top), self.repo)
-        self.assertEqual(working_folder('cd "repo" && ls', self.top), self.repo)
-
-    def test_other_commands_keep_the_folder(self):
-        self.assertEqual(working_folder("terraform apply", self.top), self.top)
-        self.assertEqual(working_folder("cd missing && ls", self.top), self.top)
-        self.assertEqual(working_folder("cd repo", self.top), self.top)
 
 
 class Speed(unittest.TestCase):

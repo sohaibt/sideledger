@@ -30,7 +30,6 @@ WRAPPERS = dict([
 ])
 # Secret and tool-version runners: whatever follows "--" is the real command.
 RUNNERS = ("doppler", "op", "infisical", "mise", "dotenv", "dotenvx", "aws-vault")
-LEADING_CD = re.compile(r"""^\s*cd\s+("[^"]+"|'[^']+'|[^\s;&|]+)\s*(?:&&|;)""")
 PREFIXES = (("pnpm", "dlx"), ("pnpm", "exec"), ("yarn", "dlx"), ("npm", "exec"), ("bundle", "exec"),
             ("uv", "run"), ("poetry", "run"), ("pdm", "run"), ("pipx", "run"), ("rye", "run"))
 HEREDOC = re.compile(r"(?<!<)<<-?\s*([\x27\x22]?)([\w.-]+)\1([^\n]*)\n(.*?)(?:^\s*\2\s*$|\Z)", re.S | re.M)
@@ -200,15 +199,6 @@ def _shell_body(tokens):
         if token.startswith("<<") and not token.startswith("<<<"):
             return token[2:]
     return None
-
-
-def working_folder(command, cwd):
-    """The folder a command acts in: a leading `cd X &&` moves it."""
-    found = LEADING_CD.match(command)
-    if not found:
-        return cwd
-    target = os.path.realpath(os.path.join(cwd, os.path.expanduser(found.group(1).strip("\"'"))))
-    return target if os.path.isdir(target) else cwd
 
 
 def _repo_root(cwd):

@@ -4,7 +4,7 @@ import pathlib
 import sqlite3
 import time
 
-from .classify import classify, working_folder
+from .classify import classify
 from .redact import redact
 
 DEFAULT_RETENTION_DAYS = 90
@@ -66,7 +66,9 @@ def next_turn(conn, session, now=None):
 def record(conn, session, cwd, command, failed, now=None):
     """Rate the raw text in memory, then store only the redacted text."""
     now = int(time.time() if now is None else now)
-    cwd = working_folder(command, cwd)
+    # cwd is Claude Code's folder AFTER the command ran (checked live 2026-11-10), so a leading
+    # `cd X &&` is already in it. ponytail: `rm a && cd b` is filed under b; a PreToolUse hook
+    # would give the folder before, add it if that case matters.
     rated = classify(command, cwd)
     cutoff = now - retention_days(conn) * 86400
     with conn:

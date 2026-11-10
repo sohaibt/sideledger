@@ -32,6 +32,13 @@ class StoreTest(unittest.TestCase):
         raw = (pathlib.Path(self.tmp.name) / "home" / "ledger.db").read_bytes()
         self.assertNotIn(b"pw123456", raw)
 
+    def test_cwd_is_stored_as_claude_code_sends_it(self):
+        # Live 2026-11-10: `cd .. && true` run from repo/bin arrived with cwd=repo (the folder after it ran).
+        repo = self.tmp.name + "/repo"
+        os.makedirs(repo + "/bin")
+        store.record(self.conn, "s1", repo, "cd .. && rm -rf build", False)
+        self.assertEqual(store.actions(self.conn, "s1")[0]["cwd"], repo)
+
     def test_classifies_before_redacting(self):
         # The heredoc body is not stored, but it still counts towards the rating.
         store.record(self.conn, "s1", "/repo", "psql <<SQL\nDROP TABLE t;\nSQL", False)
