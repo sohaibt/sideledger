@@ -87,7 +87,12 @@ def cmd_install(args):
     # The full interpreter path, because Claude Code may not have this venv on its PATH.
     command = shlex.quote(sys.executable) + HOOK_SUFFIX
     hooks = settings.setdefault("hooks", dict())
-    for event, matcher in HOOK_EVENTS:
+    if args.remove:
+        for event in list(hooks):
+            hooks[event] = _without_ours(hooks[event])
+            if not hooks[event]:
+                del hooks[event]
+    for event, matcher in () if args.remove else HOOK_EVENTS:
         entry = dict(hooks=[dict(type="command", command=command)])
         if matcher:
             entry["matcher"] = matcher
@@ -100,7 +105,10 @@ def cmd_install(args):
         out.write("\n")
     os.chmod(tmp, mode)
     os.replace(tmp, path)
-    print("sideledger: hooks added to %s. New Claude Code sessions will be recorded." % args.settings)
+    if args.remove:
+        print("sideledger: hooks removed from %s. Your ledger is kept in ~/.sideledger." % args.settings)
+    else:
+        print("sideledger: hooks added to %s. New Claude Code sessions will be recorded." % args.settings)
     return 0
 
 
@@ -209,7 +217,10 @@ def build_parser():
     sub.add_parser("hook", help="called by Claude Code, reads a hook payload on stdin").set_defaults(run=cmd_hook)
     install = sub.add_parser("install", help="add the hooks to Claude Code settings")
     install.add_argument("--settings", default=str(pathlib.Path.home() / ".claude" / "settings.json"))
-    install.set_defaults(run=cmd_install)
+    install.set_defaults(run=cmd_install, remove=False)
+    uninstall = sub.add_parser("uninstall", help="remove the hooks from Claude Code settings")
+    uninstall.add_argument("--settings", default=str(pathlib.Path.home() / ".claude" / "settings.json"))
+    uninstall.set_defaults(run=cmd_install, remove=True)
     show = sub.add_parser("receipt", help="print the receipt for a turn or session (default: the latest turn)")
     show.add_argument("--session", help="a session id, or latest. Without --turn, shows the whole session")
     show.add_argument("--turn", type=int)

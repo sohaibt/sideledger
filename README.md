@@ -22,11 +22,11 @@ Limits: sideledger reads command text only. A side effect hidden inside a script
 ## Install
 
 ```sh
-pip install sideledger
+pip install git+https://github.com/sohaibt/sideledger
 sideledger install
 ```
 
-Python 3.10 or newer, no dependencies. `sideledger install` adds three hooks to `~/.claude/settings.json` and keeps everything else in that file. Use `--settings PATH` for another file. New Claude Code sessions are then recorded.
+Not on PyPI yet; this installs from GitHub. Python 3.10 or newer, no dependencies. `sideledger install` adds three hooks to `~/.claude/settings.json` and keeps everything else in that file. Use `--settings PATH` for another file. New Claude Code sessions are then recorded.
 
 | Hook | Why |
 | --- | --- |
@@ -34,7 +34,7 @@ Python 3.10 or newer, no dependencies. `sideledger install` adds three hooks to 
 | `PostToolUseFailure` (Bash) | A deploy that exits non-zero may still have changed something. |
 | `UserPromptSubmit` | Marks where a new turn starts. The prompt text is not stored. |
 
-To remove them, delete the entries ending in `-m sideledger hook` from that file.
+`sideledger uninstall` removes them again and leaves everything else in the file alone (your ledger in `~/.sideledger` is kept).
 
 ## Usage
 
@@ -51,12 +51,14 @@ sideledger ack --id 12                      # mark one action, of any rating
 sideledger retention 30                     # keep 30 days of history (default 90)
 ```
 
-To warn before each commit:
+To warn before each commit, in a repo with no pre-commit hook yet:
 
 ```sh
 printf '#!/bin/sh\nexec sideledger check\n' > .git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
 ```
+
+If `.git/hooks/pre-commit` already exists, the command above would replace it. Add the line `sideledger check || exit 1` to it instead.
 
 `check` and `ack` look only at actions recorded in the current repo. `check` still mentions unreviewed actions in other folders, and `--all` covers every repo. `ack` refuses to run inside a Claude Code session, because a person should do the reviewing. That stops the easy route, but it is not a security boundary: an agent that wants to can edit the database or commit with `--no-verify`.
 

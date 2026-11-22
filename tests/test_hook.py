@@ -116,6 +116,15 @@ class InstallTest(Base):
             self.assertNotEqual(result.returncode, 0, broken)
             self.assertEqual(self.settings().read_text(), broken)
 
+    def test_uninstall_removes_only_our_hooks(self):
+        other = dict(matcher="Bash", hooks=[dict(type="command", command="other-tool")])
+        self.settings().write_text(json.dumps(dict(model="x", hooks=dict(PostToolUse=[other]))))
+        run(self.home, "install", "--settings", str(self.settings()))
+        result = run(self.home, "uninstall", "--settings", str(self.settings()))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(self.settings().read_text())
+        self.assertEqual(data, dict(model="x", hooks=dict(PostToolUse=[other])))
+
     def test_writes_through_a_symlink_and_keeps_the_mode(self):
         real = self.tmp / "dotfiles.json"
         real.write_text("{}")
