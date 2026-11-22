@@ -93,7 +93,7 @@ def to_sarif(data):
     driver = dict(name="sideledger", version=__version__, informationUri=HOMEPAGE, rules=rules)
     run = dict(tool=dict(driver=driver), results=results, properties=dict(limits=data["limits"], unreviewedElsewhere=data["unreviewed_elsewhere"]))
     doc = dict(version="2.1.0", runs=[run])
-    doc["\x24schema"] = SARIF_SCHEMA
+    doc["$schema"] = SARIF_SCHEMA
     return json.dumps(doc, indent=2)
 
 

@@ -51,8 +51,8 @@ class Combining(unittest.TestCase):
 class ShellForms(unittest.TestCase):
     def test_hidden_inside_shell_syntax(self):
         for command in [
-            "echo \x24\x28git push -f\x29",
-            "echo \x60git push -f\x60",
+            "echo $(git push -f)",
+            "echo `git push -f`",
             "for f in a b; do git push -f; done",
             "bash <<EOF\ngit push -f\nEOF",
             'eval "git push -f"',
@@ -72,7 +72,7 @@ class ShellForms(unittest.TestCase):
             self.assertEqual((got["categories"], got["rating"]), (["git-push"], "irreversible"), command)
 
     def test_arithmetic_and_redirects_are_not_commands(self):
-        for command in ["echo \x24\x28\x281+2\x29\x29", "ls 2>&1", "for f in *.py; do wc -l \x24f; done"]:
+        for command in ["echo $((1+2))", "ls 2>&1", "for f in *.py; do wc -l $f; done"]:
             got = classify(command)
             self.assertEqual((got["categories"], got["rating"]), (["local"], "reversible"), command)
 

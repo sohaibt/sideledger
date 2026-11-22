@@ -16,11 +16,11 @@ RULES = json.loads(pathlib.Path(__file__).with_name("rules.json").read_text())
 for _rule in RULES:
     _rule["regex"] = re.compile(_rule["pattern"])
 
-SQ, DQ, DOLLAR, BACKTICK = "\x27", "\x22", "\x24", "\x60"
-SUBST = DOLLAR + "\x28"
+SQ, DQ, DOLLAR, BACKTICK = "'", '"', "$", "`"
+SUBST = DOLLAR + "("
 SHELLS = ("bash", "sh", "zsh", "dash", "ksh")
-SKIP = ("fi", "done", "esac", "\x7d", ";;", "for", "case", "select", "function")
-KEYWORDS = ("then", "do", "else", "elif", "if", "while", "until", "!", "\x7b")
+SKIP = ("fi", "done", "esac", "}", ";;", "for", "case", "select", "function")
+KEYWORDS = ("then", "do", "else", "elif", "if", "while", "until", "!", "{")
 # Wrapper -> its options that take a value. The wrapped command is what gets rated.
 WRAPPERS = dict([
     ("sudo", ["-u", "-g", "-h", "-p", "-C", "-r", "-t", "-U"]), ("doas", ["-u", "-C"]), ("env", ["-u", "-C", "-S"]),
@@ -32,12 +32,12 @@ WRAPPERS = dict([
 RUNNERS = ("doppler", "op", "infisical", "mise", "dotenv", "dotenvx", "aws-vault")
 PREFIXES = (("pnpm", "dlx"), ("pnpm", "exec"), ("yarn", "dlx"), ("npm", "exec"), ("bundle", "exec"),
             ("uv", "run"), ("poetry", "run"), ("pdm", "run"), ("pipx", "run"), ("rye", "run"))
-HEREDOC = re.compile(r"(?<!<)<<-?\s*([\x27\x22]?)([\w.-]+)\1([^\n]*)\n(.*?)(?:^\s*\2\s*$|\Z)", re.S | re.M)
+HEREDOC = re.compile(r"(?<!<)<<-?\s*(['\"]?)([\w.-]+)\1([^\n]*)\n(.*?)(?:^\s*\2\s*$|\Z)", re.S | re.M)
 
-URL = re.compile(r"(?:^|=)([a-zA-Z][a-zA-Z0-9+.-]*)://(?:[^/@\s]*@)?([^/\s?#\x27\x22]+)")
+URL = re.compile(r"(?:^|=)([a-zA-Z][a-zA-Z0-9+.-]*)://(?:[^/@\s]*@)?([^/\s?#'\"]+)")
 SCP = re.compile(r"^(?:[\w.-]+@)?([\w.-]+):(?!//)")
 BARE_HOST = re.compile(r"^[\w-]+(?:\.[\w-]+)+(?::\d+)?(?:/\S*)?$")
-VARIABLE = re.compile(r"^\x24\x7b?(\w+)\x7d?")
+VARIABLE = re.compile(r"^\$\{?(\w+)\}?")
 BODY_PREFIXES = ("--data", "--json", "--form", "--post", "--body", "--header", "--output")
 HTTP_VALUE_FLAGS = ("-o", "-H", "-d", "-X", "-u", "-A", "-e", "-b", "-c", "-F", "-T", "-m", "-w", "-x", "-O", "-E",
                     "--request", "--user", "--user-agent", "--referer", "--cookie", "--upload-file", "--max-time",
@@ -56,9 +56,9 @@ def _attach_heredocs(text):
 def _closing(text, start):
     depth = 1
     for i in range(start, len(text)):
-        if text[i] == "\x28":
+        if text[i] == "(":
             depth += 1
-        elif text[i] == "\x29":
+        elif text[i] == ")":
             depth -= 1
             if not depth:
                 return i
@@ -84,8 +84,8 @@ def _split(text):
             quote = None if c == SQ else quote
             buf.append(c)
             i += 1
-        elif text.startswith(SUBST + "\x28", i):  # arithmetic, not a command
-            end = text.find("\x29\x29", i)
+        elif text.startswith(SUBST + "(", i):  # arithmetic, not a command
+            end = text.find("))", i)
             end = n if end < 0 else end + 2
             buf.append("0")
             i = end
@@ -117,7 +117,7 @@ def _split(text):
         elif c == "&" and (text[i - 1:i] == ">" or text[i + 1:i + 2] == ">"):  # 2>&1, &>file
             buf.append(c)
             i += 1
-        elif c in ";|&\n\x28\x29":
+        elif c in ";|&\n()":
             flush()
             i += 1
         else:

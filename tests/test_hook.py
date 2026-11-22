@@ -118,7 +118,7 @@ class InstallTest(Base):
 
     def test_writes_through_a_symlink_and_keeps_the_mode(self):
         real = self.tmp / "dotfiles.json"
-        real.write_text("\x7b\x7d")
+        real.write_text("{}")
         real.chmod(0o640)
         self.settings().symlink_to(real)
         run(self.home, "install", "--settings", str(self.settings()))
